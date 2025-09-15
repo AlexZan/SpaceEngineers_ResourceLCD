@@ -2,13 +2,15 @@
 // Purpose: Ore and ingot totals on two LCDs, sorted ascending, aligned columns. Tank logic removed.
 // Notes: Uses NL char to avoid wrapped string literals. Monospace font recommended on panels.
 
-const string ORE_PANEL_NAME = "Ore Panel";
-const string INGOT_PANEL_NAME = "Ingot Panel";
+const string ORE_PANEL_TAG = "[ResLCD Ore]";
+const string INGOT_PANEL_TAG = "[ResLCD Ingot]";
 const float ICE_THRESHOLD = 42000.0f;
 const char NL = '\n';
 const int RESCAN_INTERVAL = 10;
 
-List<IMyTerminalBlock> cachedLcds = new List<IMyTerminalBlock>();
+List<IMyTextPanel> cachedPanels = new List<IMyTextPanel>();
+List<IMyTextSurface> orePanels = new List<IMyTextSurface>();
+List<IMyTextSurface> ingotPanels = new List<IMyTextSurface>();
 List<IMyTerminalBlock> cachedBlocks = new List<IMyTerminalBlock>();
 List<IMyInventory> cachedInventories = new List<IMyInventory>();
 int cyclesSinceRescan = 0;
@@ -29,8 +31,26 @@ static readonly string[] INGOT_KEYS = new string[]
 
 void Rescan()
 {
-    cachedLcds.Clear();
-    GridTerminalSystem.GetBlocksOfType<IMyTextSurface>(cachedLcds, filterThis);
+    cachedPanels.Clear();
+    orePanels.Clear();
+    ingotPanels.Clear();
+    GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(cachedPanels, filterPanels);
+
+    for (int i = 0; i < cachedPanels.Count; i++)
+    {
+        var panel = cachedPanels[i];
+        var surface = panel.GetSurface(0);
+        bool added = false;
+        if (PanelHasTag(panel, surface, ORE_PANEL_TAG))
+        {
+            orePanels.Add(surface);
+            added = true;
+        }
+        if (!added && PanelHasTag(panel, surface, INGOT_PANEL_TAG))
+        {
+            ingotPanels.Add(surface);
+        }
+    }
 
     cachedBlocks.Clear();
     GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(cachedBlocks, filterInventories);
@@ -55,20 +75,9 @@ void Main(string argument)
     string ERR_TXT = "";
 
     // Panels
-    var lcds = cachedLcds;
-    IMyTextSurface vOre = null, vIng = null;
-    if (lcds.Count == 0) ERR_TXT += "no LCD Panel blocks found" + NL;
-    else
-    {
-        for (int i = 0; i < lcds.Count; i++)
-        {
-            var name = lcds[i].CustomName;
-            if (vOre == null && name.Contains(ORE_PANEL_NAME)) vOre = (IMyTextSurface)lcds[i];
-            if (vIng == null && name.Contains(INGOT_PANEL_NAME)) vIng = (IMyTextSurface)lcds[i];
-        }
-        if (vOre == null && vIng == null)
-            ERR_TXT += "no LCD Panel block named " + ORE_PANEL_NAME + " or " + INGOT_PANEL_NAME + " found" + NL;
-    }
+    if (cachedPanels.Count == 0) ERR_TXT += "no LCD Panel blocks found" + NL;
+    else if (orePanels.Count == 0 && ingotPanels.Count == 0)
+        ERR_TXT += "no LCD panels tagged with " + ORE_PANEL_TAG + " or " + INGOT_PANEL_TAG + " found" + NL;
 
     // Inventories
     if (cachedBlocks.Count == 0) ERR_TXT += "No blocks with inventories found" + NL;
@@ -81,10 +90,6 @@ void Main(string argument)
         return;
     }
     else Echo("");
-
-    // Ensure panel font for alignment
-    if (vOre != null) { vOre.Font = "Monospace"; vOre.FontSize = 1f; vOre.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT; vOre.FontColor = new Color(255,255,255); }
-    if (vIng != null) { vIng.Font = "Monospace"; vIng.FontSize = 1f; vIng.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT; vIng.FontColor = new Color(255,255,255); }
 
     // Tally
     IDictionary<string, float> ore = new Dictionary<string, float>();
@@ -110,14 +115,22 @@ void Main(string argument)
     }
 
     // Build panel texts
-    string oreText = BuildPanelText(ore, vOre, true);
-    string ingText = BuildPanelText(ing, vIng, false);
+    bool oreHasLowIce;
+    string oreText = BuildPanelText(ore, true, out oreHasLowIce);
+    bool ingHasLowIce;
+    string ingText = BuildPanelText(ing, false, out ingHasLowIce);
 
-    // Write to panels with graceful fallback
-    if (vOre != null) { vOre.ContentType = VRage.Game.GUI.TextPanel.ContentType.TEXT_AND_IMAGE; vOre.WriteText(oreText, false); }
-    if (vIng != null) { vIng.ContentType = VRage.Game.GUI.TextPanel.ContentType.TEXT_AND_IMAGE; vIng.WriteText(ingText, false); }
-    if (vOre != null && vIng == null) { vOre.WriteText("ORE" + NL + oreText + NL + NL + "INGOTS" + NL + ingText, false); }
-    else if (vIng != null && vOre == null) { vIng.WriteText("ORE" + NL + oreText + NL + NL + ingText, false); }
+    string oreDisplay = oreText;
+    string ingDisplay = ingText;
+    if (orePanels.Count > 0 && ingotPanels.Count == 0)
+        oreDisplay = "ORE" + NL + oreText + NL + NL + "INGOTS" + NL + ingText;
+    if (ingotPanels.Count > 0 && orePanels.Count == 0)
+        ingDisplay = "ORE" + NL + oreText + NL + NL + ingText;
+
+    bool highlightIngotPanels = orePanels.Count == 0 && ingotPanels.Count > 0 && oreHasLowIce;
+
+    WritePanelText(orePanels, oreDisplay, oreHasLowIce);
+    WritePanelText(ingotPanels, ingDisplay, highlightIngotPanels);
 }
 
 // Helpers
@@ -126,7 +139,21 @@ void Seed(IDictionary<string,float> dict, string[] keys)
     for (int i = 0; i < keys.Length; i++) dict[keys[i]] = 0f;
 }
 
-string BuildPanelText(IDictionary<string,float> dict, IMyTextSurface panel, bool isOre)
+void WritePanelText(List<IMyTextSurface> panels, string text, bool highlightLowIce)
+{
+    for (int i = 0; i < panels.Count; i++)
+    {
+        var panel = panels[i];
+        panel.ContentType = VRage.Game.GUI.TextPanel.ContentType.TEXT_AND_IMAGE;
+        panel.Font = "Monospace";
+        panel.FontSize = 1f;
+        panel.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+        panel.FontColor = highlightLowIce ? new Color(255, 0, 0) : new Color(255, 255, 255);
+        panel.WriteText(text, false);
+    }
+}
+
+string BuildPanelText(IDictionary<string,float> dict, bool isOre, out bool highlightLowIce)
 {
     var list = new List<KeyValuePair<string, float>>(dict);
     list.Sort((a, b) => a.Value.CompareTo(b.Value));
@@ -139,12 +166,13 @@ string BuildPanelText(IDictionary<string,float> dict, IMyTextSurface panel, bool
     }
 
     string text = "";
+    highlightLowIce = false;
     for (int i = 0; i < list.Count; i++)
     {
         var kvp = list[i];
         bool isIce = isOre && kvp.Key == "Ice";
         string qty = FormatQty(kvp.Value, isIce);
-        if (isIce && panel != null && kvp.Value < ICE_THRESHOLD) panel.FontColor = new Color(255, 0, 0);
+        if (isIce && kvp.Value < ICE_THRESHOLD) highlightLowIce = true;
         string label = kvp.Key + ": ";
         if (text.Length > 0) text += NL;
         text += PadRight(label, labelWidth) + qty;
@@ -179,7 +207,33 @@ IEnumerable<IMyInventory> EnumerateInventories(IMyTerminalBlock block)
     }
 }
 
-bool filterThis(IMyTerminalBlock block) { return block.CubeGrid == Me.CubeGrid; }
+bool filterPanels(IMyTextPanel panel) { return panel.CubeGrid == Me.CubeGrid; }
+
+bool PanelHasTag(IMyTextPanel panel, IMyTextSurface surface, string tag)
+{
+    string customData = panel.CustomData;
+    if (ContainsTag(customData, tag)) return true;
+
+    string surfaceText = surface.GetText();
+    if (ContainsTag(surfaceText, tag))
+    {
+        PersistTag(panel, tag, customData);
+        return true;
+    }
+    return false;
+}
+
+void PersistTag(IMyTextPanel panel, string tag, string existingCustomData)
+{
+    if (ContainsTag(existingCustomData, tag)) return;
+    string data = string.IsNullOrEmpty(existingCustomData) ? tag : existingCustomData + NL + tag;
+    panel.CustomData = data;
+}
+
+bool ContainsTag(string source, string tag)
+{
+    return !string.IsNullOrEmpty(source) && source.IndexOf(tag, System.StringComparison.OrdinalIgnoreCase) >= 0;
+}
 
 bool filterInventories(IMyTerminalBlock block)
 {
