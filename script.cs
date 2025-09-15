@@ -39,7 +39,8 @@ void Rescan()
     for (int i = 0; i < cachedPanels.Count; i++)
     {
         var panel = cachedPanels[i];
-        var surface = panel.GetSurface(0);
+        var surface = GetPrimarySurface(panel);
+        if (surface == null) continue;
         bool added = false;
         if (PanelHasTag(panel, surface, ORE_PANEL_TAG))
         {
@@ -211,6 +212,7 @@ bool filterPanels(IMyTextPanel panel) { return panel.CubeGrid == Me.CubeGrid; }
 
 bool PanelHasTag(IMyTextPanel panel, IMyTextSurface surface, string tag)
 {
+    if (surface == null) return false;
     string customData = panel.CustomData;
     if (ContainsTag(customData, tag)) return true;
 
@@ -233,6 +235,11 @@ void PersistTag(IMyTextPanel panel, string tag, string existingCustomData)
 bool ContainsTag(string source, string tag)
 {
     return !string.IsNullOrEmpty(source) && source.IndexOf(tag, System.StringComparison.OrdinalIgnoreCase) >= 0;
+}
+
+IMyTextSurface GetPrimarySurface(IMyTextPanel panel)
+{
+    return panel as IMyTextSurface;
 }
 
 bool filterInventories(IMyTerminalBlock block)
