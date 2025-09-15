@@ -6,6 +6,13 @@ const string ORE_PANEL_NAME = "Ore Panel";
 const string INGOT_PANEL_NAME = "Ingot Panel";
 const float ICE_THRESHOLD = 42000.0f;
 const char NL = '\n';
+const int RESCAN_INTERVAL = 10;
+
+List<IMyTerminalBlock> cachedLcds = new List<IMyTerminalBlock>();
+List<IMyTerminalBlock> cachedBlocks = new List<IMyTerminalBlock>();
+List<IMyInventory> cachedInventories = new List<IMyInventory>();
+int cyclesSinceRescan = 0;
+bool hasScanned = false;
 
 // Keys to always show
 static readonly string[] ORE_KEYS = new string[]
@@ -20,16 +27,36 @@ static readonly string[] INGOT_KEYS = new string[]
     "Platinum Ingot","Silicon Wafer","Silver Ingot","Uranium Ingot"
 };
 
+void Rescan()
+{
+    cachedLcds.Clear();
+    GridTerminalSystem.GetBlocksOfType<IMyTextSurface>(cachedLcds, filterThis);
+
+    cachedBlocks.Clear();
+    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(cachedBlocks, filterInventories);
+
+    cachedInventories.Clear();
+    for (int i = 0; i < cachedBlocks.Count; i++)
+    {
+        cachedInventories.AddRange(EnumerateInventories(cachedBlocks[i]));
+    }
+
+    cyclesSinceRescan = 0;
+    hasScanned = true;
+}
+
 void Main(string argument)
 {
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
+    if (!hasScanned || argument == "rescan") Rescan();
+    else if (++cyclesSinceRescan >= RESCAN_INTERVAL) Rescan();
+
     string ERR_TXT = "";
 
     // Panels
-    var lcds = new List<IMyTerminalBlock>();
+    var lcds = cachedLcds;
     IMyTextSurface vOre = null, vIng = null;
-    GridTerminalSystem.GetBlocksOfType<IMyTextSurface>(lcds, filterThis);
     if (lcds.Count == 0) ERR_TXT += "no LCD Panel blocks found" + NL;
     else
     {
@@ -44,16 +71,9 @@ void Main(string argument)
     }
 
     // Inventories
-    var inventoriedBlocks = new List<IMyTerminalBlock>();
-    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(inventoriedBlocks, filterInventories);
-    if (inventoriedBlocks.Count == 0) ERR_TXT += "No blocks with inventories found" + NL;
+    if (cachedBlocks.Count == 0) ERR_TXT += "No blocks with inventories found" + NL;
 
-    var inventories = new List<IMyInventory>();
-    for (int i = 0; i < inventoriedBlocks.Count; i++)
-    {
-        inventories.Add(inventoriedBlocks[i].GetInventory(0));
-        if (inventoriedBlocks[i].InventoryCount == 2) inventories.Add(inventoriedBlocks[i].GetInventory(1));
-    }
+    var inventories = cachedInventories;
 
     if (ERR_TXT != "")
     {
@@ -148,6 +168,15 @@ string PadRight(string input, int num)
 {
     if (input.Length < num) for (int i = input.Length; i < num; i++) input += " ";
     return input;
+}
+
+IEnumerable<IMyInventory> EnumerateInventories(IMyTerminalBlock block)
+{
+    int inventoryCount = block.InventoryCount;
+    for (int i = 0; i < inventoryCount; i++)
+    {
+        yield return block.GetInventory(i);
+    }
 }
 
 bool filterThis(IMyTerminalBlock block) { return block.CubeGrid == Me.CubeGrid; }
