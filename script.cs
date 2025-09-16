@@ -4,7 +4,6 @@
 
 const string ORE_PANEL_TAG = "[ResLCD Ore]";
 const string INGOT_PANEL_TAG = "[ResLCD Ingot]";
-const float ICE_THRESHOLD = 42000.0f;
 const char NL = '\n';
 const int RESCAN_INTERVAL = 10;
 
@@ -116,10 +115,8 @@ void Main(string argument)
     }
 
     // Build panel texts
-    bool oreHasLowIce;
-    string oreText = BuildPanelText(ore, true, out oreHasLowIce);
-    bool ingHasLowIce;
-    string ingText = BuildPanelText(ing, false, out ingHasLowIce);
+    string oreText = BuildPanelText(ore, true);
+    string ingText = BuildPanelText(ing, false);
 
     string oreDisplay = oreText;
     string ingDisplay = ingText;
@@ -128,10 +125,8 @@ void Main(string argument)
     if (ingotPanels.Count > 0 && orePanels.Count == 0)
         ingDisplay = "ORE" + NL + oreText + NL + NL + ingText;
 
-    bool highlightIngotPanels = orePanels.Count == 0 && ingotPanels.Count > 0 && oreHasLowIce;
-
-    WritePanelText(orePanels, oreDisplay, oreHasLowIce);
-    WritePanelText(ingotPanels, ingDisplay, highlightIngotPanels);
+    WritePanelText(orePanels, oreDisplay);
+    WritePanelText(ingotPanels, ingDisplay);
 }
 
 // Helpers
@@ -140,7 +135,7 @@ void Seed(IDictionary<string,float> dict, string[] keys)
     for (int i = 0; i < keys.Length; i++) dict[keys[i]] = 0f;
 }
 
-void WritePanelText(List<IMyTextSurface> panels, string text, bool highlightLowIce)
+void WritePanelText(List<IMyTextSurface> panels, string text)
 {
     for (int i = 0; i < panels.Count; i++)
     {
@@ -149,12 +144,12 @@ void WritePanelText(List<IMyTextSurface> panels, string text, bool highlightLowI
         panel.Font = "Monospace";
         panel.FontSize = 1f;
         panel.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-        panel.FontColor = highlightLowIce ? new Color(255, 0, 0) : new Color(255, 255, 255);
+        panel.FontColor = new Color(255, 255, 255);
         panel.WriteText(text, false);
     }
 }
 
-string BuildPanelText(IDictionary<string,float> dict, bool isOre, out bool highlightLowIce)
+string BuildPanelText(IDictionary<string,float> dict, bool isOre)
 {
     var list = new List<KeyValuePair<string, float>>(dict);
     list.Sort((a, b) => a.Value.CompareTo(b.Value));
@@ -167,13 +162,11 @@ string BuildPanelText(IDictionary<string,float> dict, bool isOre, out bool highl
     }
 
     string text = "";
-    highlightLowIce = false;
     for (int i = 0; i < list.Count; i++)
     {
         var kvp = list[i];
         bool isIce = isOre && kvp.Key == "Ice";
         string qty = FormatQty(kvp.Value, isIce);
-        if (isIce && kvp.Value < ICE_THRESHOLD) highlightLowIce = true;
         string label = kvp.Key + ": ";
         if (text.Length > 0) text += NL;
         text += PadRight(label, labelWidth) + qty;
