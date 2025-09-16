@@ -2,8 +2,6 @@
 // Purpose: Ore and ingot totals on two LCDs, sorted ascending, aligned columns. Tank logic removed.
 // Notes: Uses NL char to avoid wrapped string literals. Monospace font recommended on panels.
 
-using System.Text;
-
 const string ORE_PANEL_TAG = "[ResLCD Ore]";
 const string INGOT_PANEL_TAG = "[ResLCD Ingot]";
 const char NL = '\n';
@@ -180,7 +178,7 @@ string BuildPanelText(IDictionary<string,float> dict, bool isOre)
         if (w > labelWidth) labelWidth = w;
     }
 
-    var builder = new StringBuilder();
+    var builder = new System.Text.StringBuilder();
     for (int i = 0; i < list.Count; i++)
     {
         var kvp = list[i];
