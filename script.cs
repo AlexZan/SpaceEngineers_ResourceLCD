@@ -191,11 +191,44 @@ string BuildPanelText(IDictionary<string,float> dict, bool isOre)
     return text;
 }
 
+// Examples of the formatting behaviour:
+// FormatQty(950f, false)   => "950"
+// FormatQty(1500f, false)  => "1.5k"
+// FormatQty(1250000f, false) => "1.25M"
+// FormatQty(2500000000f, false) => "2.5B"
+// FormatQty(1500f, true)   => "1500" (forceInteger disables scaling)
 string FormatQty(float v, bool forceInteger)
 {
-    if (forceInteger) return ((float)Math.Round((double)v, 0)).ToString();
-    if (v < 5000f) return ((float)Math.Round((double)v, 0)).ToString();
-    return ((float)Math.Round((double)(v / 1000f), 0)).ToString() + "k";
+    if (forceInteger) return Math.Round((double)v, 0).ToString();
+
+    double absValue = Math.Abs((double)v);
+    if (absValue < 1000d) return Math.Round((double)v, 0).ToString();
+
+    string[] suffixes = new[] { "k", "M", "B" };
+    double scaled = v;
+    int suffixIndex = -1;
+
+    while (suffixIndex + 1 < suffixes.Length && Math.Abs(scaled) >= 1000d)
+    {
+        scaled /= 1000d;
+        suffixIndex++;
+    }
+
+    double absScaled = Math.Abs(scaled);
+    int decimals = absScaled >= 100d ? 0 : (absScaled >= 10d ? 1 : 2);
+    double rounded = Math.Round(scaled, decimals);
+
+    if (Math.Abs(rounded) >= 1000d && suffixIndex + 1 < suffixes.Length)
+    {
+        scaled = rounded / 1000d;
+        suffixIndex++;
+        absScaled = Math.Abs(scaled);
+        decimals = absScaled >= 100d ? 0 : (absScaled >= 10d ? 1 : 2);
+        rounded = Math.Round(scaled, decimals);
+    }
+
+    string format = decimals == 0 ? "0" : "0." + new string('#', decimals);
+    return rounded.ToString(format) + suffixes[suffixIndex];
 }
 
 float getItemAmountAsFloat(MyInventoryItem item)
