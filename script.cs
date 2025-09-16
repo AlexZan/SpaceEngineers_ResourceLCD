@@ -185,7 +185,7 @@ string BuildPanelText(IDictionary<string,float> dict, bool isOre)
         string qty = FormatQty(kvp.Value, isIce);
         string label = kvp.Key + ": ";
         if (text.Length > 0) text += NL;
-        text += PadRight(label, labelWidth) + qty;
+        text += label.PadRight(labelWidth) + qty;
     }
     return text;
 }
@@ -200,12 +200,6 @@ string FormatQty(float v, bool forceInteger)
 float getItemAmountAsFloat(MyInventoryItem item)
 {
     return (float)item.Amount;
-}
-
-string PadRight(string input, int num)
-{
-    if (input.Length < num) for (int i = input.Length; i < num; i++) input += " ";
-    return input;
 }
 
 IEnumerable<IMyInventory> EnumerateInventories(IMyTerminalBlock block)
