@@ -2,10 +2,14 @@
 // Purpose: Ore and ingot totals on two LCDs, sorted ascending, aligned columns. Tank logic removed.
 // Notes: Uses NL char to avoid wrapped string literals. Monospace font recommended on panels.
 
-const string ORE_PANEL_TAG = "[ResLCD Ore]";
-const string INGOT_PANEL_TAG = "[ResLCD Ingot]";
+const string DEFAULT_ORE_PANEL_TAG = "[ResLCD Ore]";
+const string DEFAULT_INGOT_PANEL_TAG = "[ResLCD Ingot]";
 const char NL = '\n';
-const int RESCAN_INTERVAL = 10;
+const int DEFAULT_RESCAN_INTERVAL = 10;
+
+string orePanelTag = DEFAULT_ORE_PANEL_TAG;
+string ingotPanelTag = DEFAULT_INGOT_PANEL_TAG;
+int rescanInterval = DEFAULT_RESCAN_INTERVAL;
 
 List<IMyTextPanel> cachedPanels = new List<IMyTextPanel>();
 List<IMyTextSurface> orePanels = new List<IMyTextSurface>();
@@ -45,6 +49,97 @@ static readonly Dictionary<string, string> INGOT_EXCEPTIONS = new Dictionary<str
     {"Silicon", "Silicon Wafer"},
 };
 
+bool LoadConfig()
+{
+    string previousOreTag = orePanelTag;
+    string previousIngotTag = ingotPanelTag;
+    int previousRescanInterval = rescanInterval;
+
+    orePanelTag = DEFAULT_ORE_PANEL_TAG;
+    ingotPanelTag = DEFAULT_INGOT_PANEL_TAG;
+    rescanInterval = DEFAULT_RESCAN_INTERVAL;
+
+    string data = Me.CustomData;
+    if (!string.IsNullOrWhiteSpace(data))
+    {
+        string[] lines = data.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].Trim();
+            if (string.IsNullOrEmpty(line)) continue;
+            if (line.StartsWith("//") || line.StartsWith("#") || line.StartsWith(";")) continue;
+
+            int separatorIndex = line.IndexOf('=');
+            if (separatorIndex < 0)
+            {
+                separatorIndex = line.IndexOf(':');
+                if (separatorIndex < 0) continue;
+            }
+
+            string key = line.Substring(0, separatorIndex).Trim();
+            string value = line.Substring(separatorIndex + 1).Trim();
+            if (key.Length == 0) continue;
+
+            value = TrimMatchingQuotes(value).Trim();
+
+            if (string.Equals(key, "RESCAN_INTERVAL", StringComparison.OrdinalIgnoreCase))
+            {
+                int parsed;
+                if (int.TryParse(value, out parsed) && parsed > 0)
+                {
+                    rescanInterval = parsed;
+                }
+            }
+            else if (string.Equals(key, "ORE_PANEL_TAG", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    orePanelTag = value;
+                }
+            }
+            else if (string.Equals(key, "INGOT_PANEL_TAG", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    ingotPanelTag = value;
+                }
+            }
+        }
+    }
+
+    if (rescanInterval <= 0)
+    {
+        rescanInterval = DEFAULT_RESCAN_INTERVAL;
+    }
+
+    bool tagsChanged = !string.Equals(previousOreTag, orePanelTag, StringComparison.Ordinal);
+    if (!tagsChanged)
+    {
+        tagsChanged = !string.Equals(previousIngotTag, ingotPanelTag, StringComparison.Ordinal);
+    }
+
+    if (previousRescanInterval != rescanInterval && cyclesSinceRescan > rescanInterval)
+    {
+        cyclesSinceRescan = rescanInterval;
+    }
+
+    return tagsChanged;
+}
+
+string TrimMatchingQuotes(string value)
+{
+    if (value.Length >= 2)
+    {
+        char first = value[0];
+        char last = value[value.Length - 1];
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\''))
+        {
+            return value.Substring(1, value.Length - 2);
+        }
+    }
+    return value;
+}
+
 void Rescan()
 {
     cachedPanels.Clear();
@@ -58,12 +153,12 @@ void Rescan()
         var surface = GetPrimarySurface(panel);
         if (surface == null) continue;
         bool added = false;
-        if (PanelHasTag(panel, surface, ORE_PANEL_TAG))
+        if (PanelHasTag(panel, surface, orePanelTag))
         {
             orePanels.Add(surface);
             added = true;
         }
-        if (!added && PanelHasTag(panel, surface, INGOT_PANEL_TAG))
+        if (!added && PanelHasTag(panel, surface, ingotPanelTag))
         {
             ingotPanels.Add(surface);
         }
@@ -86,15 +181,17 @@ void Main(string argument)
 {
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
-    if (!hasScanned || argument == "rescan") Rescan();
-    else if (++cyclesSinceRescan >= RESCAN_INTERVAL) Rescan();
+    bool configChanged = LoadConfig();
+
+    if (!hasScanned || argument == "rescan" || configChanged) Rescan();
+    else if (++cyclesSinceRescan >= rescanInterval) Rescan();
 
     string ERR_TXT = "";
 
     // Panels
     if (cachedPanels.Count == 0) ERR_TXT += "no LCD Panel blocks found" + NL;
     else if (orePanels.Count == 0 && ingotPanels.Count == 0)
-        ERR_TXT += "no LCD panels tagged with " + ORE_PANEL_TAG + " or " + INGOT_PANEL_TAG + " found" + NL;
+        ERR_TXT += "no LCD panels tagged with " + orePanelTag + " or " + ingotPanelTag + " found" + NL;
 
     // Inventories
     if (cachedBlocks.Count == 0) ERR_TXT += "No blocks with inventories found" + NL;
