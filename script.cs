@@ -12,6 +12,7 @@ List<IMyTextSurface> orePanels = new List<IMyTextSurface>();
 List<IMyTextSurface> ingotPanels = new List<IMyTextSurface>();
 List<IMyTerminalBlock> cachedBlocks = new List<IMyTerminalBlock>();
 List<IMyInventory> cachedInventories = new List<IMyInventory>();
+List<MyInventoryItem> inventoryBuffer = new List<MyInventoryItem>();
 int cyclesSinceRescan = 0;
 bool hasScanned = false;
 
@@ -254,11 +255,15 @@ IMyTextSurface GetPrimarySurface(IMyTextPanel panel)
 bool filterInventories(IMyTerminalBlock block)
 {
     if (block.CubeGrid != Me.CubeGrid || !block.HasInventory) return false;
-    List<MyInventoryItem> items = new List<MyInventoryItem>();
     int allItemsCount = 0;
-    block.GetInventory(0).GetItems(items); allItemsCount += items.Count;
-    if (block.InventoryCount == 2) { items.Clear(); block.GetInventory(1).GetItems(items); allItemsCount += items.Count; }
-    if (allItemsCount == 0) return false; return true;
+    for (int i = 0; i < block.InventoryCount; i++)
+    {
+        inventoryBuffer.Clear();
+        block.GetInventory(i).GetItems(inventoryBuffer, filterItemsForOreAndIngots);
+        allItemsCount += inventoryBuffer.Count;
+        if (allItemsCount > 0) break;
+    }
+    return allItemsCount > 0;
 }
 
 private bool filterItemsForOreAndIngots(MyInventoryItem item)
