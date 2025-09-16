@@ -22,10 +22,26 @@ static readonly string[] ORE_KEYS = new string[]
     "Silver Ore","Gold Ore","Platinum Ore","Uranium Ore","Stone","Organic","Scrap Metal","Ice"
 };
 
+static readonly Dictionary<string, string> ORE_EXCEPTIONS = new Dictionary<string, string>()
+{
+    {"Scrap", "Scrap Metal"},
+    {"Stone", "Stone"},
+    {"Ice", "Ice"},
+    {"Organic", "Organic"},
+};
+
 static readonly string[] INGOT_KEYS = new string[]
 {
     "Cobalt Ingot","Gold Ingot","Iron Ingot","Magnesium Pow","Nickel Ingot",
     "Platinum Ingot","Silicon Wafer","Silver Ingot","Uranium Ingot"
+};
+
+static readonly Dictionary<string, string> INGOT_EXCEPTIONS = new Dictionary<string, string>()
+{
+    {"Scrap", "Old Scrap Metal"},
+    {"Stone", "Gravel"},
+    {"Magnesium", "Magnesium Pow"},
+    {"Silicon", "Silicon Wafer"},
 };
 
 void Rescan()
@@ -258,17 +274,15 @@ string decodeItemName(MyInventoryItem item)
 
     if (typeId.EndsWith("Ore"))
     {
-        if (sub.Equals("Scrap")) return "Scrap Metal";
-        if (sub.Equals("Stone") || sub.Equals("Ice") || sub.Equals("Organic")) return sub;
+        string name;
+        if (ORE_EXCEPTIONS.TryGetValue(sub, out name)) return name;
         return sub + " Ore";
     }
 
     if (typeId.EndsWith("Ingot"))
     {
-        if (sub.Equals("Scrap")) return "Old Scrap Metal";
-        if (sub.Equals("Stone")) return "Gravel";
-        if (sub.Equals("Magnesium")) return "Magnesium Pow";
-        if (sub.Equals("Silicon")) return "Silicon Wafer";
+        string name;
+        if (INGOT_EXCEPTIONS.TryGetValue(sub, out name)) return name;
         return sub + " Ingot";
     }
 
