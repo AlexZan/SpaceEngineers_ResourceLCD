@@ -199,7 +199,7 @@ string FormatQty(float v, bool forceInteger)
 
 float getItemAmountAsFloat(MyInventoryItem item)
 {
-    float count = 0f; float.TryParse("" + item.Amount, out count); return count;
+    return (float)item.Amount;
 }
 
 string PadRight(string input, int num)
