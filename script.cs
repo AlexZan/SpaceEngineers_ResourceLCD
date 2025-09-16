@@ -50,7 +50,7 @@ void Rescan()
     cachedPanels.Clear();
     orePanels.Clear();
     ingotPanels.Clear();
-    GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(cachedPanels, filterPanels);
+    GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(cachedPanels, FilterPanels);
 
     for (int i = 0; i < cachedPanels.Count; i++)
     {
@@ -70,7 +70,7 @@ void Rescan()
     }
 
     cachedBlocks.Clear();
-    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(cachedBlocks, filterInventories);
+    GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(cachedBlocks, FilterInventories);
 
     cachedInventories.Clear();
     for (int i = 0; i < cachedBlocks.Count; i++)
@@ -123,8 +123,8 @@ void Main(string argument)
         {
             var it = buffer[j];
             string typeId = it.Type.TypeId;
-            string name = decodeItemName(it);
-            float amt = getItemAmountAsFloat(it);
+            string name = DecodeItemName(it);
+            float amt = GetItemAmountAsFloat(it);
             float prev;
             if (typeId.EndsWith("Ore")) { if (ore.TryGetValue(name, out prev)) ore[name] = prev + amt; }
             else if (typeId.EndsWith("Ingot")) { if (ing.TryGetValue(name, out prev)) ing[name] = prev + amt; }
@@ -231,7 +231,7 @@ string FormatQty(float v, bool forceInteger)
     return rounded.ToString(format) + suffixes[suffixIndex];
 }
 
-float getItemAmountAsFloat(MyInventoryItem item)
+float GetItemAmountAsFloat(MyInventoryItem item)
 {
     return (float)item.Amount;
 }
@@ -245,7 +245,7 @@ IEnumerable<IMyInventory> EnumerateInventories(IMyTerminalBlock block)
     }
 }
 
-bool filterPanels(IMyTextPanel panel) { return panel.CubeGrid == Me.CubeGrid; }
+bool FilterPanels(IMyTextPanel panel) { return panel.CubeGrid == Me.CubeGrid; }
 
 bool PanelHasTag(IMyTextPanel panel, IMyTextSurface surface, string tag)
 {
@@ -279,7 +279,7 @@ IMyTextSurface GetPrimarySurface(IMyTextPanel panel)
     return panel as IMyTextSurface;
 }
 
-bool filterInventories(IMyTerminalBlock block)
+bool FilterInventories(IMyTerminalBlock block)
 {
     if (block.CubeGrid != Me.CubeGrid || !block.HasInventory) return false;
     int allItemsCount = 0;
@@ -299,7 +299,7 @@ private bool filterItemsForOreAndIngots(MyInventoryItem item)
 }
 
 // Minimal Ore/Ingot display names
-string decodeItemName(MyInventoryItem item)
+string DecodeItemName(MyInventoryItem item)
 {
     string typeId = item.Type.TypeId;
     string sub = item.Type.SubtypeId;
