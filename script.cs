@@ -178,17 +178,18 @@ string BuildPanelText(IDictionary<string,float> dict, bool isOre)
         if (w > labelWidth) labelWidth = w;
     }
 
-    string text = "";
+    var builder = new System.Text.StringBuilder();
     for (int i = 0; i < list.Count; i++)
     {
         var kvp = list[i];
         bool isIce = isOre && kvp.Key == "Ice";
         string qty = FormatQty(kvp.Value, isIce);
         string label = kvp.Key + ": ";
-        if (text.Length > 0) text += NL;
-        text += label.PadRight(labelWidth) + qty;
+        if (builder.Length > 0) builder.AppendLine();
+        builder.Append(label.PadRight(labelWidth));
+        builder.Append(qty);
     }
-    return text;
+    return builder.ToString();
 }
 
 // Examples of the formatting behaviour:
